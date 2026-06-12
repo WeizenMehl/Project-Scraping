@@ -134,7 +134,7 @@ class GeizhalsLaptopScraper:
                 time.sleep(self.delay)
 
             except requests.RequestException as e:
-                print(f"❌ Error on page {page}: {e}")
+                print(f"Error on page {page}: {e}")
                 continue
 
         print(f"Found {len(links)} total product links")
