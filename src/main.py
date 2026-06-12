@@ -113,7 +113,7 @@ class GeizhalsLaptopScraper:
         links = []
 
         for page in range(1, self.max_pages + 1):
-            print(f"📄 Scraping page {page}/{self.max_pages}")
+            print(f"Scraping page {page}/{self.max_pages}")
 
             url = self.SEARCH_URL.format(page=page)
             try:
@@ -137,7 +137,7 @@ class GeizhalsLaptopScraper:
                 print(f"❌ Error on page {page}: {e}")
                 continue
 
-        print(f"✅ Found {len(links)} total product links")
+        print(f"Found {len(links)} total product links")
         return links
 
     def extract_price_range(self, soup: BeautifulSoup) -> tuple[str, str]:
@@ -194,7 +194,7 @@ class GeizhalsLaptopScraper:
             # Extract specs grid
             specs_grid = soup.find("dl", class_="specs-grid")
             if not specs_grid:
-                print(f"⚠️  No specs grid found for {name}")
+                print(f"No specs grid found for {name}")
                 return None
 
             specs = {}
@@ -208,7 +208,7 @@ class GeizhalsLaptopScraper:
             os_value = specs.get("Betriebssystem", "Not specified")
             if os_value == "Not specified":
                 self.no_os_count += 1
-                print(f"ℹ️  No OS found for {name} ({self.no_os_count} total)")
+                print(f"No OS found for {name} ({self.no_os_count} total)")
 
             # Parse display specs
             display_specs = self.parse_display_specs(specs.get("Display", ""))
@@ -229,34 +229,34 @@ class GeizhalsLaptopScraper:
             )
 
         except requests.RequestException as e:
-            print(f"❌ Network error for {url}: {e}")
+            print(f"Network error for {url}: {e}")
             return None
         except Exception as e:
-            print(f"❌ Parse error for {url}: {e}")
+            print(f"Parse error for {url}: {e}")
             return None
 
     def scrape_all(self) -> None:
         """Main scraping workflow."""
-        print("🚀 Starting Geizhals laptop scraper...")
+        print("Starting Geizhals laptop scraper...")
 
         # Get all product links
         links = self.get_product_links()
 
         # Scrape individual products
-        print(f"\n📊 Scraping details for {len(links)} products...")
+        print(f"\nScraping details for {len(links)} products...")
         for i, link in enumerate(links, 1):
             print(f"[{i}/{len(links)}] Processing: {link.split('/')[-1]}")
 
             laptop = self.scrape_product(link)
             if laptop:
                 self.laptops.append(laptop)
-                print(f"   ✅ Added: {laptop.name}")
+                print(f"   Added: {laptop.name}")
             else:
-                print("   ❌ Skipped")
+                print("   Skipped")
 
             time.sleep(self.delay)  # Rate limiting
 
-        print("\n🎉 Scraping complete!")
+        print("\nScraping complete!")
         print(f"   Total laptops: {len(self.laptops)}")
         print(f"   No OS found: {self.no_os_count}")
 
@@ -303,7 +303,7 @@ class GeizhalsLaptopScraper:
                 }
                 writer.writerow(row)
 
-        print(f"💾 Saved {len(self.laptops)} laptops to {filename}")
+        print(f"Saved {len(self.laptops)} laptops to {filename}")
 
 
 def main():
