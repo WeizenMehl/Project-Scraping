@@ -1,28 +1,15 @@
 import pandas as pd
 import numpy as np
 import re
-
-from sklearn.model_selection import (
-    train_test_split,
-    cross_val_score
-)
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import (
-    mean_squared_error,
-    mean_absolute_error,
-    r2_score
-)
-
-# =====================================================
-# LOAD DATA
-# =====================================================
-
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 df = pd.read_csv("../laptops.csv")
 
-# =====================================================
-# CLEAN PRICE COLUMNS
-# =====================================================
 
+# CLEAN PRICE COLUMNS
 def clean_price(price):
     if pd.isna(price) or price == "":
         return np.nan
@@ -38,79 +25,67 @@ def clean_price(price):
     except:
         return np.nan
 
+
 df["price_max"] = df["price_max"].apply(clean_price)
 df["price_min"] = df["price_min"].apply(clean_price)
 
 df = df.dropna(subset=["price_max"])
 
-# =====================================================
-# RAM (GB)
-# =====================================================
 
+# RAM (GB)
 df["ram_gb"] = (
     df["ram"]
     .str.extract(r"(\d+)")
     .astype(float)
 )
 
-# =====================================================
-# CPU CORES
-# =====================================================
 
+# CPU CORES
 def extract_cpu_cores(cpu):
     if pd.isna(cpu):
         return np.nan
 
     cpu = str(cpu)
 
-    # Apple
     match = re.search(r"(\d+)\s*Core", cpu, re.IGNORECASE)
     if match:
         return float(match.group(1))
 
-    # AMD style
     match = re.search(r"(\d+)C\/\d+T", cpu)
     if match:
         return float(match.group(1))
 
-    # Intel hybrid
     matches = re.findall(r"(\d+)(?:P|E|LPE)", cpu)
-
     if matches:
         return float(sum(map(int, matches)))
 
-    # Qualcomm
     match = re.search(r"(\d+)x\s+Oryon", cpu)
     if match:
         return float(match.group(1))
 
     return np.nan
+
+
 df["cpu_cores"] = df["cpu"].apply(extract_cpu_cores)
 
-# =====================================================
-# CPU MAX GHZ
-# =====================================================
 
+# CPU MAX GHZ
 def extract_max_ghz(cpu):
     if pd.isna(cpu):
         return np.nan
 
-    values = re.findall(
-        r"(\d+\.\d+)GHz",
-        str(cpu)
-    )
+    values = re.findall(r"(\d+\.\d+)GHz", str(cpu))
 
     if not values:
         return np.nan
 
     return max(map(float, values))
 
+
 df["cpu_max_ghz"] = df["cpu"].apply(extract_max_ghz)
 
-# =====================================================
-# GPU FEATURES (CORES + VRAM)
-# =====================================================
 
+# GPU FEATURES
 def extract_gpu_cores(gpu):
     if pd.isna(gpu):
         return np.nan
@@ -118,9 +93,9 @@ def extract_gpu_cores(gpu):
     gpu = str(gpu)
 
     patterns = [
-        r"(\d+)-Core",   # Apple style
-        r"(\d+)Xe",      # Intel
-        r"(\d+)CU"       # AMD
+        r"(\d+)-Core",
+        r"(\d+)Xe",
+        r"(\d+)CU"
     ]
 
     for pattern in patterns:
@@ -132,27 +107,19 @@ def extract_gpu_cores(gpu):
 
 
 def extract_vram(gpu):
-    """
-    Extract VRAM in GB (ONLY for discrete GPUs like NVIDIA/AMD dGPU).
-    iGPU + Apple GPU => 0
-    """
-
     if pd.isna(gpu):
         return np.nan
 
     gpu = str(gpu)
 
-    # NVIDIA / AMD dedicated VRAM (8GB, 12GB, etc.)
     match = re.search(r"(\d+)\s*GB", gpu, re.IGNORECASE)
     if match:
         return float(match.group(1))
 
-    # Some formats like "8GB GDDR6"
     match = re.search(r"(\d+)\s*GDDR", gpu, re.IGNORECASE)
     if match:
         return float(match.group(1))
 
-    # Apple / iGPU assumed no VRAM
     if "Apple" in gpu or "iGPU" in gpu or "Intel Graphics" in gpu:
         return 0.0
 
@@ -162,28 +129,15 @@ def extract_vram(gpu):
 df["gpu_cores"] = df["gpu"].apply(extract_gpu_cores)
 df["vram_gb"] = df["gpu"].apply(extract_vram)
 
-df["gpu_cores"] = df["gpu"].apply(extract_gpu_cores)
 
-# =====================================================
-# PPI
-# =====================================================
-
-df["ppi"] = (
-    df["ppi"]
-    .str.replace("ppi", "", regex=False)
-    .astype(float)
-)
-
-# =====================================================
-# REFRESH RATE
-# =====================================================
+# DISPLAY FEATURES
+df["ppi"] = df["ppi"].str.replace("ppi", "", regex=False).astype(float)
 
 def extract_hz(value):
     if pd.isna(value):
         return np.nan
 
     value = str(value).replace("Hz", "")
-
     numbers = re.findall(r"\d+", value)
 
     if not numbers:
@@ -191,11 +145,9 @@ def extract_hz(value):
 
     return float(max(map(int, numbers)))
 
+
 df["hz"] = df["hz"].apply(extract_hz)
 
-# =====================================================
-# RESOLUTION
-# =====================================================
 
 df[["res_width", "res_height"]] = (
     df["resolution"]
@@ -203,15 +155,8 @@ df[["res_width", "res_height"]] = (
     .astype(float)
 )
 
-# New feature
-df["total_pixels"] = (
-    df["res_width"] *
-    df["res_height"]
-)
+df["total_pixels"] = df["res_width"] * df["res_height"]
 
-# =====================================================
-# ASPECT RATIO
-# =====================================================
 
 def aspect_to_float(ratio):
     if pd.isna(ratio):
@@ -223,14 +168,8 @@ def aspect_to_float(ratio):
     except:
         return np.nan
 
-df["aspect_ratio_num"] = (
-    df["aspect_ratio"]
-    .apply(aspect_to_float)
-)
 
-# =====================================================
-# SCREEN SIZE
-# =====================================================
+df["aspect_ratio_num"] = df["aspect_ratio"].apply(aspect_to_float)
 
 df["screen_size"] = (
     df["dimension"]
@@ -238,20 +177,9 @@ df["screen_size"] = (
     .astype(float)
 )
 
-# =====================================================
-# BRAND
-# =====================================================
 
-df["brand"] = (
-    df["name"]
-    .fillna("")
-    .str.split()
-    .str[0]
-)
+df["brand"] = df["name"].fillna("").str.split().str[0]
 
-# =====================================================
-# KEEP ONLY USEFUL COLUMNS
-# =====================================================
 
 base_features = [
     "ram_gb",
@@ -268,53 +196,33 @@ base_features = [
     "screen_size"
 ]
 
-# =====================================================
-# ONE HOT ENCODE BRAND + OS
-# =====================================================
 
-df = pd.get_dummies(
-    df,
-    columns=["brand", "os"],
-    drop_first=True
-)
+df = pd.get_dummies(df, columns=["brand", "os"], drop_first=True)
 
 dummy_columns = [
     col for col in df.columns
-    if col.startswith("brand_")
-    or col.startswith("os_")
+    if col.startswith("brand_") or col.startswith("os_")
 ]
 
 features = base_features + dummy_columns
 
-# =====================================================
-# TRAINING DATA
-# =====================================================
 
 X = df[features]
-
 X = X.fillna(X.median(numeric_only=True))
 
-# explicitly fix GPU missing meaning
 X["vram_gb"] = X["vram_gb"].fillna(0)
 X["gpu_cores"] = X["gpu_cores"].fillna(0)
 
 y = df["price_max"]
 
-# =====================================================
-# TRAIN TEST SPLIT
-# =====================================================
 
+# TRAIN TEST SPLIT
 X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.20,
-    random_state=42
+    X, y, test_size=0.20, random_state=42
 )
 
-# =====================================================
-# RANDOM FOREST
-# =====================================================
 
+# MODEL
 rf = RandomForestRegressor(
     n_estimators=1000,
     max_depth=20,
@@ -326,111 +234,78 @@ rf = RandomForestRegressor(
 
 rf.fit(X_train, y_train)
 
-# =====================================================
-# PREDICTIONS
-# =====================================================
-
 y_pred = rf.predict(X_test)
 
-# =====================================================
-# METRICS
-# =====================================================
 
+# METRICS
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mse)
 mae = mean_absolute_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
-
-print("\n==============================")
 print("MODEL PERFORMANCE")
-print("==============================")
-
 print(f"MAE :  {mae:.2f} €")
 print(f"RMSE:  {rmse:.2f} €")
 print(f"R²  :  {r2:.4f}")
 
-# =====================================================
+
 # CROSS VALIDATION
-# =====================================================
+cv_scores = cross_val_score(rf, X, y, cv=5, scoring="r2", n_jobs=-1)
 
-cv_scores = cross_val_score(
-    rf,
-    X,
-    y,
-    cv=5,
-    scoring="r2",
-    n_jobs=-1
-)
-
-print("\n==============================")
 print("CROSS VALIDATION")
-print("==============================")
 
-print("Fold Scores:")
 print(cv_scores)
+print(f"Mean R²: {cv_scores.mean():.4f}")
 
-print(f"\nMean R²: {cv_scores.mean():.4f}")
-print(f"Std Dev: {cv_scores.std():.4f}")
-
-# =====================================================
-# FEATURE IMPORTANCE
-# =====================================================
-
-importance_df = pd.DataFrame({
-    "Feature": features,
-    "Importance": rf.feature_importances_
-})
-
-importance_df = importance_df.sort_values(
-    "Importance",
-    ascending=False
-)
-
-print("\n==============================")
-print("TOP 20 FEATURES")
-print("==============================")
-
-print(importance_df.head(20))
-
-# =====================================================
-# PREDICTION ERROR ANALYSIS
-# =====================================================
-
+# RESULTS TABLE
 results = pd.DataFrame({
     "Actual": y_test.values,
     "Predicted": y_pred
 })
 
-results["Error"] = (
-    results["Predicted"] -
-    results["Actual"]
-)
+results["Error"] = results["Predicted"] - results["Actual"]
+results["Abs_Error"] = results["Error"].abs()
 
-results["Abs_Error"] = (
-    results["Error"].abs()
-)
-
-print("\n==============================")
-print("SAMPLE PREDICTIONS")
-print("==============================")
-
+print("\nSAMPLE PREDICTIONS")
 print(results.head(15))
 
-print("\nAverage Error:")
-print(results["Abs_Error"].mean())
+sns.set_style("whitegrid")
 
-# =====================================================
+plt.figure(figsize=(7, 6))
+plt.scatter(y_test, y_pred, alpha=0.6)
+plt.plot([y_test.min(), y_test.max()],
+         [y_test.min(), y_test.max()],
+         "r--")
+
+plt.xlabel("Actual Price (€)")
+plt.ylabel("Predicted Price (€)")
+plt.title("Actual vs Predicted Prices")
+plt.tight_layout()
+plt.savefig("prediction.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+# FEATURE IMPORTANCE
+importance_df = pd.DataFrame({
+    "Feature": features,
+    "Importance": rf.feature_importances_
+}).sort_values("Importance", ascending=False)
+
+plt.figure(figsize=(8, 6))
+sns.barplot(
+    data=importance_df.head(15),
+    x="Importance",
+    y="Feature"
+)
+plt.title("Top Feature Importance")
+plt.tight_layout()
+plt.savefig("features", dpi=300, bbox_inches="tight")
+plt.close()
+
+
 # EXAMPLE PREDICTION
-# =====================================================
-
 sample = X.iloc[[0]]
-
 prediction = rf.predict(sample)[0]
 
-print("\n==============================")
-print("EXAMPLE PREDICTION")
-print("==============================")
-
-print(f"Actual Price    : {y.iloc[0]:.2f} €")
-print(f"Predicted Price : {prediction:.2f} €")
+print("\nEXAMPLE PREDICTION")
+print(f"Actual    : {y.iloc[0]:.2f} €")
+print(f"Predicted : {prediction:.2f} €")
